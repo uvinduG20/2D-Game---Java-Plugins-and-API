@@ -1,0 +1,221 @@
+PARSER_BEGIN(GameConfigParser)
+
+package edu.curtin.saed.assignment1;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class GameConfigParser {
+    public int rows, cols;
+    public int startRow, startCol;
+    public int goalRow, goalCol;
+    public List<Item> items = new ArrayList<Item>();
+    public List<Obstacle> obstacles = new ArrayList<Obstacle>();
+    public List<String> plugins = new ArrayList<String>();
+    public List<String> scripts = new ArrayList<String>();
+
+    public void parseInputFile() throws ParseException {
+        parse(this);
+    }
+
+    public void setGridSize(int rows, int cols) {
+        this.rows = rows;
+        this.cols = cols;
+        System.out.println("Grid size: " + rows + "x" + cols);
+    }
+
+    public void setStartPosition(int startRow, int startCol) {
+        this.startRow = startRow;
+        this.startCol = startCol;
+        System.out.println("Start position: (" + startRow + "," + startCol + ")");
+    }
+
+    public void setGoalPosition(int goalRow, int goalCol) {
+        this.goalRow = goalRow;
+        this.goalCol = goalCol;
+        System.out.println("Goal position: (" + goalRow + "," + goalCol + ")");
+    }
+
+    public void addItem(String name, List<Location> locations, String message) {
+        items.add(new Item(name, locations, message));
+        System.out.println("Parsed item: " + name + " at locations: " + locations);
+    }
+
+    public void addObstacle(List<Location> locations, List<String> requiredItems) {
+        obstacles.add(new Obstacle(locations, requiredItems));
+        System.out.println("Parsed obstacle with requirements: " + requiredItems);
+    }
+
+    public void addPlugin(String pluginName) {
+        plugins.add(pluginName);
+        System.out.println("Parsed plugin: " + pluginName);
+    }
+
+    public void addScript(String scriptContent) {
+        scripts.add(scriptContent);
+        System.out.println("Parsed script content.");
+    }
+
+    // Helper method to strip quotes
+    public String stripQuotes(String s) {
+        return s.substring(1, s.length() - 1);
+    }
+
+    // Method to switch lexical states
+    public void SwitchTo(int lexState) {
+        token_source.SwitchTo(lexState);
+    }
+}
+
+PARSER_END(GameConfigParser)
+
+// Define keywords first
+TOKEN : { <SIZE : "size"> }
+TOKEN : { <START : "start"> }
+TOKEN : { <GOAL : "goal"> }
+TOKEN : { <ITEM : "item"> }
+TOKEN : { <OBSTACLE : "obstacle"> }
+TOKEN : { <PLUGIN : "plugin"> }
+TOKEN : { <SCRIPT : "script"> }
+TOKEN : { <MESSAGE : "message"> }
+TOKEN : { <AT : "at"> }
+TOKEN : { <REQUIRES : "requires"> }
+
+// Symbols
+TOKEN : { <LBRACE : "{"> }
+TOKEN : { <RBRACE : "}"> }
+TOKEN : { <LPAREN : "("> }
+TOKEN : { <RPAREN : ")"> }
+TOKEN : { <COMMA : ","> }
+TOKEN : { <EXCLAMATION : "!" > }
+TOKEN : { <DOT : "." > }
+
+// Other tokens
+TOKEN : { <NUMBER : (["0"-"9"])+ > }
+TOKEN : { <STRING_LITERAL : "\"" (~["\\", "\""] | "\\" ["\\", "\""])* "\"" > }
+TOKEN : {
+    <PLUGIN_NAME : (["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* )
+                  ( "." ["a"-"z", "A"-"Z", "_"] (["a"-"z", "A"-"Z", "_", "0"-"9"])* )*
+> }
+
+// Lexical states
+<DEFAULT> TOKEN : { <SCRIPT_START : "!{" > }
+<IN_SCRIPT> TOKEN : {
+    < SCRIPT_END : "}" > | // Renamed to avoid conflict with <RBRACE>
+    < SCRIPT_CONTENT : (~["}"])+ > // Matches any non-empty content until "}"
+}
+
+// Skip spaces and line breaks
+SKIP : { " " | "\t" | "\n" | "\r" }
+
+// Main Parsing Rule with strict order for each component
+void parse(GameConfigParser parserInstance) : {} {
+    sizeDeclaration(parserInstance)
+    startDeclaration(parserInstance)
+    goalDeclaration(parserInstance)
+    (itemDeclaration(parserInstance) | obstacleDeclaration(parserInstance) | pluginDeclaration(parserInstance) | scriptDeclaration(parserInstance))*
+}
+
+// Parsing for grid size
+void sizeDeclaration(GameConfigParser parserInstance) : {
+    Token rowToken, colToken;
+} {
+    <SIZE> <LPAREN> rowToken=<NUMBER> <COMMA> colToken=<NUMBER> <RPAREN> {
+        parserInstance.setGridSize(Integer.parseInt(rowToken.image), Integer.parseInt(colToken.image));
+    }
+}
+
+// Parsing for start position
+void startDeclaration(GameConfigParser parserInstance) : {
+    Token startRowToken, startColToken;
+} {
+    <START> <LPAREN> startRowToken=<NUMBER> <COMMA> startColToken=<NUMBER> <RPAREN> {
+        parserInstance.setStartPosition(Integer.parseInt(startRowToken.image), Integer.parseInt(startColToken.image));
+    }
+}
+
+// Parsing for goal position
+void goalDeclaration(GameConfigParser parserInstance) : {
+    Token goalRowToken, goalColToken;
+} {
+    <GOAL> <LPAREN> goalRowToken=<NUMBER> <COMMA> goalColToken=<NUMBER> <RPAREN> {
+        parserInstance.setGoalPosition(Integer.parseInt(goalRowToken.image), Integer.parseInt(goalColToken.image));
+    }
+}
+
+// Parsing for item declaration
+void itemDeclaration(GameConfigParser parserInstance) : {
+    Token nameToken, messageToken;
+    List<Location> locationList;
+} {
+    <ITEM> nameToken = <STRING_LITERAL> <LBRACE>
+    <AT> locationList = locations()
+    <MESSAGE> messageToken = <STRING_LITERAL>
+    <RBRACE> {
+        parserInstance.addItem(parserInstance.stripQuotes(nameToken.image), locationList, parserInstance.stripQuotes(messageToken.image));
+    }
+}
+
+// Parsing for obstacle declaration
+void obstacleDeclaration(GameConfigParser parserInstance) : {
+    List<Location> locationList;
+    List<String> requiredItemsList;
+} {
+    <OBSTACLE> <LBRACE>
+    <AT> locationList = locations()
+    <REQUIRES> requiredItemsList = requiredItems(parserInstance)
+    <RBRACE> {
+        parserInstance.addObstacle(locationList, requiredItemsList);
+    }
+}
+
+// Parsing for plugin declaration
+void pluginDeclaration(GameConfigParser parserInstance) : {
+    Token pluginNameToken;
+} {
+    <PLUGIN> pluginNameToken = <PLUGIN_NAME> {
+        parserInstance.addPlugin(pluginNameToken.image);
+    }
+}
+
+// Parsing for script declaration
+void scriptDeclaration(GameConfigParser parserInstance) : {
+    Token scriptContentToken = null;
+} {
+    <SCRIPT> <SCRIPT_START> {
+        parserInstance.SwitchTo(IN_SCRIPT);
+    }
+    [ scriptContentToken = <SCRIPT_CONTENT> ]
+    <SCRIPT_END> { // Updated to use <SCRIPT_END> instead of <RBRACE>
+        parserInstance.SwitchTo(DEFAULT);
+        String content = (scriptContentToken != null) ? scriptContentToken.image : "";
+        parserInstance.addScript(content);
+    }
+}
+
+// Helper Parsing Rules for locations and required items
+List<Location> locations() : {
+    List<Location> locationList = new ArrayList<Location>();
+    Token rowToken, colToken;
+} {
+    <LPAREN> rowToken = <NUMBER> <COMMA> colToken = <NUMBER> <RPAREN> {
+        locationList.add(new Location(Integer.parseInt(rowToken.image), Integer.parseInt(colToken.image)));
+    }
+    ( <COMMA> <LPAREN> rowToken = <NUMBER> <COMMA> colToken = <NUMBER> <RPAREN> {
+        locationList.add(new Location(Integer.parseInt(rowToken.image), Integer.parseInt(colToken.image)));
+    })*
+    { return locationList; }
+}
+
+List<String> requiredItems(GameConfigParser parserInstance) : {
+    List<String> requiredItemsList = new ArrayList<String>();
+    Token itemToken;
+} {
+    itemToken = <STRING_LITERAL> {
+        requiredItemsList.add(parserInstance.stripQuotes(itemToken.image));
+    }
+    ( <COMMA> itemToken = <STRING_LITERAL> {
+        requiredItemsList.add(parserInstance.stripQuotes(itemToken.image));
+    })*
+    { return requiredItemsList; }
+}

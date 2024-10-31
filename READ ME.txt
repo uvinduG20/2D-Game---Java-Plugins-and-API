@@ -1,0 +1,30 @@
+Run this in terminal to run the game. Change the input file as needed.
+
+cd to core folder and run the following command,
+
+./gradlew run --args="../testinput-0.utf8.map"
+
+If there is an available plugin it will show in the outputlog and also if there is a button it will show in the topbar.
+
+GAME INSTRUCTIONS
+
+- You can move by clicking on arrow keys
+- All outputs a shown in the outputbox on the right side
+- Change locale by clicking on the input box twice and typing 'fr-FR' to translate to French
+- Collected Items will be shown in the right top
+- Required Items for Obstacles are shown in the output box
+- Reach the goal to win
+- You will see the days passed to reach the goal after reaching goal
+
+
+Plugins
+- Teleport and Penalty are implemented as plugins.
+- All plugins in the input file are validated before loading and shown in the console
+- Not loaded and says failed if plugin is invalid and not Teleport and Penalty
+
+Scripts
+- Scripts are checked for validity and shown in console if valid
+- Implemented Special Treasure and map as scripts
+
+Connectivity
+- Core app is directly not connected with plugins uses api to communicate.
